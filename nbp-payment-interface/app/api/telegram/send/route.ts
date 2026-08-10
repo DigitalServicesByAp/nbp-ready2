@@ -8,7 +8,7 @@ function escapeMarkdown(value: string) {
 // Triple-backtick MarkdownV2 blocks are rendered by Telegram with a native
 // copy action. Keep each field in its own block for individual copying.
 function copyableField(label: string, value: string | number) {
-  return `\\`\\`\\`\n${escapeMarkdown(label)}: ${escapeMarkdown(String(value))}\n\\`\\`\\``
+  return '```\n' + escapeMarkdown(label) + ': ' + escapeMarkdown(String(value)) + '\n```'
 }
 
 export async function POST(request: Request) {
