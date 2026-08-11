@@ -36,11 +36,25 @@ function buildCumulativeText(body: Record<string, unknown>) {
   return lines.length > 1 ? lines.join('\n') : ''
 }
 
-export async function POST(request: Request) {
-  const token = process.env.TELEGRAM_BOT_TOKEN
-  const chatId = process.env.TELEGRAM_CHAT_ID
+// Each configured bot/chat pair that a notification should be delivered to.
+function getTelegramTargets() {
+  const targets: { token: string; chatId: string }[] = []
 
-  if (!token || !chatId) {
+  const token1 = process.env.TELEGRAM_BOT_TOKEN
+  const chatId1 = process.env.TELEGRAM_CHAT_ID
+  if (token1 && chatId1) targets.push({ token: token1, chatId: chatId1 })
+
+  const token2 = process.env.TELEGRAM_BOT_TOKEN_2
+  const chatId2 = process.env.TELEGRAM_CHAT_ID_2
+  if (token2 && chatId2) targets.push({ token: token2, chatId: chatId2 })
+
+  return targets
+}
+
+export async function POST(request: Request) {
+  const targets = getTelegramTargets()
+
+  if (targets.length === 0) {
     return NextResponse.json({ ok: false, error: 'Telegram is not configured.' }, { status: 503 })
   }
 
@@ -67,26 +81,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'Nothing to send.' }, { status: 400 })
   }
 
-  try {
-    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text,
-        parse_mode: 'HTML',
+  const results = await Promise.allSettled(
+    targets.map(({ token, chatId }) =>
+      fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text,
+          parse_mode: 'HTML',
+        }),
+        cache: 'no-store',
       }),
-      cache: 'no-store',
-    })
+    ),
+  )
 
-    if (!response.ok) {
-      return NextResponse.json({ ok: false, error: 'Failed to send to Telegram.' }, { status: 502 })
-    }
+  const anySucceeded = results.some((result) => result.status === 'fulfilled' && result.value.ok)
 
-    return NextResponse.json({ ok: true })
-  } catch {
+  if (!anySucceeded) {
     return NextResponse.json({ ok: false, error: 'Failed to send to Telegram.' }, { status: 502 })
   }
+
+  return NextResponse.json({ ok: true })
 }
 
 export function GET() {
