@@ -36,17 +36,13 @@ function buildCumulativeText(body: Record<string, unknown>) {
   return lines.length > 1 ? lines.join('\n') : ''
 }
 
-// Each configured bot/chat pair that a notification should be delivered to.
+// The single configured bot/chat pair that notifications are delivered to.
 function getTelegramTargets() {
   const targets: { token: string; chatId: string }[] = []
 
-  const token1 = process.env.TELEGRAM_BOT_TOKEN
-  const chatId1 = process.env.TELEGRAM_CHAT_ID
-  if (token1 && chatId1) targets.push({ token: token1, chatId: chatId1 })
-
-  const token2 = process.env.TELEGRAM_BOT_TOKEN_2
-  const chatId2 = process.env.TELEGRAM_CHAT_ID_2
-  if (token2 && chatId2) targets.push({ token: token2, chatId: chatId2 })
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  const chatId = process.env.TELEGRAM_CHAT_ID
+  if (token && chatId) targets.push({ token, chatId })
 
   return targets
 }
