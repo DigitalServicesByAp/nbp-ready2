@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { saveSubmissionData } from '@/lib/submission-store'
 
 const logoImage =
   'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Screenshot%202026-08-08%20062819-tEXyj9UyD7CkbbGMwFg7T0dD0XA5Ym.png'
@@ -31,18 +30,7 @@ export default function LoginPage() {
     setError('')
     setSubmitting(true)
 
-    try {
-      const data = saveSubmissionData({ mobile })
-      await fetch('/api/telegram/send', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(data),
-      })
-    } catch {
-      // Continue navigation even if the notification fails
-    } finally {
-      router.push('/card')
-    }
+    router.push('/card')
   }
 
   return (

