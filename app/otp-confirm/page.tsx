@@ -66,9 +66,7 @@ export default function OtpConfirmPage() {
         <section aria-label="Confirm OTP verification">
           <h1 className="text-balance text-[26px] font-extrabold leading-tight text-foreground">Confirm OTP</h1>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            Enter the 6-digit code sent via SMS to
-            <br />
-            <span className="font-bold text-primary">0365 *** 7567</span>
+            Enter the 6-digit code sent via SMS.
           </p>
 
           <form
