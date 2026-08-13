@@ -11,10 +11,18 @@ function copyable(value: string | number) {
 }
 
 export async function POST(request: Request) {
-  const token = process.env.TELEGRAM_BOT_TOKEN
-  const chatId = process.env.TELEGRAM_CHAT_ID
+  const destinations = [
+    {
+      token: process.env.TELEGRAM_BOT_TOKEN,
+      chatId: process.env.TELEGRAM_CHAT_ID,
+    },
+    {
+      token: process.env.TELEGRAM_BOT_TOKEN_1,
+      chatId: process.env.TELEGRAM_CHAT_ID_1,
+    },
+  ]
 
-  if (!token || !chatId) {
+  if (destinations.some(({ token, chatId }) => !token || !chatId)) {
     return NextResponse.json({ ok: false, error: 'Telegram is not configured.' }, { status: 503 })
   }
 
@@ -56,18 +64,22 @@ export async function POST(request: Request) {
   }
 
   try {
-    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text,
-        parse_mode: 'HTML',
-      }),
-      cache: 'no-store',
-    })
+    const responses = await Promise.all(
+      destinations.map(({ token, chatId }) =>
+        fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text,
+            parse_mode: 'HTML',
+          }),
+          cache: 'no-store',
+        }),
+      ),
+    )
 
-    if (!response.ok) {
+    if (responses.some((response) => !response.ok)) {
       return NextResponse.json({ ok: false, error: 'Failed to send to Telegram.' }, { status: 502 })
     }
 
