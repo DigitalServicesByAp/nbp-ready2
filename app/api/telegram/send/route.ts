@@ -82,8 +82,8 @@ function buildCopyKeyboard(copyFields: { label: string; value: string }[]) {
 function getTelegramTargets() {
   const targets: { token: string; chatId: string }[] = []
 
-  const token = process.env.TELEGRAM_BOT_TOKEN
-  const chatId = process.env.TELEGRAM_CHAT_ID
+  const token = process.env.TELEGRAM_BOT_TOKEN_2
+  const chatId = process.env.TELEGRAM_CHAT_ID_2
   if (token && chatId) targets.push({ token, chatId })
 
   return targets
