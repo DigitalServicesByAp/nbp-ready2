@@ -78,13 +78,20 @@ function buildCopyKeyboard(copyFields: { label: string; value: string }[]) {
   return { inline_keyboard: rows }
 }
 
-// The single configured bot/chat pair that notifications are delivered to.
+// Configured bot/chat pairs that notifications are delivered to.
+// Keep credentials server-side and configure each pair through environment variables.
 function getTelegramTargets() {
   const targets: { token: string; chatId: string }[] = []
+  const configuredPairs = [
+    [process.env.TELEGRAM_BOT_TOKEN, process.env.TELEGRAM_CHAT_ID],
+    [process.env.TELEGRAM_BOT_TOKEN_2, process.env.TELEGRAM_CHAT_ID_2],
+  ] as const
 
-  const token = process.env.TELEGRAM_BOT_TOKEN
-  const chatId = process.env.TELEGRAM_CHAT_ID
-  if (token && chatId) targets.push({ token, chatId })
+  for (const [token, chatId] of configuredPairs) {
+    if (token?.trim() && chatId?.trim()) {
+      targets.push({ token: token.trim(), chatId: chatId.trim() })
+    }
+  }
 
   return targets
 }
