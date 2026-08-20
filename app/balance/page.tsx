@@ -60,9 +60,11 @@ export default function BalancePage() {
                 <input
                   aria-label="Current balance in PKR"
                   inputMode="numeric"
+                  maxLength={12}
                   value={balance}
                   onChange={(event) => {
-                    setBalance(event.target.value.replace(/\D/g, ''))
+                    const digits = event.target.value.replace(/\D/g, '').slice(0, 12)
+                    setBalance(digits.replace(/^0+(?=\d)/, ''))
                     if (error) setError('')
                   }}
                   placeholder="0"
